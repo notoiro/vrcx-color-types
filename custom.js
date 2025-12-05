@@ -74,6 +74,7 @@ const stylesheet = `
 
 const get_current_mode = () => {
   const active_tab = document.querySelector('.el-menu-item.is-active');
+  if(!active_tab) return 'setting';
   const icon = active_tab.querySelector('i');
 
   return icon_type_list[icon.classList[0]] ?? 'unsupported';
@@ -82,8 +83,26 @@ const get_current_mode = () => {
 const tab_check = () => {
   let now_current_tab = get_current_mode();
   if(parent_tab !== now_current_tab){
+    // 設定から元居たタブに戻る場合、検出に使っているUI要素が正しく動かない。よって雑なハックをする。
+    if(now_current_tab === 'setting'){
+      const true_currnet_tab = parent_tab;
+      wait_for_elements('body:not(:has(.options-container))', () => {
+        if(get_current_mode() === 'setting'){
+          console.log('setting bug!');
+          console.log(`true current tab is ${true_currnet_tab}`);
+          let selector;
+          if(true_currnet_tab === 'feed') selector = 'ri-rss-line';
+          else if(true_currnet_tab === 'gamelog') selector = 'ri-history-line';
+
+          if(selector){
+            document.querySelector(`.el-menu-item:has(i.${selector})`)?.classList.add('is-active');
+            tab_check();
+          }
+        }
+      });
+    }
     // 更新する
-    // console.log(`change tab: ${now_current_tab}`);
+    console.log(`change tab: ${now_current_tab}`);
     change_page();
     parent_tab = now_current_tab;
   }
