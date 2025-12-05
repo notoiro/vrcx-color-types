@@ -1,17 +1,14 @@
-// settings
-const load_wait = 3;
-
 let parent_tab = 'unknown';
 // Friend Logは作者が非表示にしてるので非対応。
 // Notificationは面倒な割にあんまり使う気がしないので非対応。
 const icon_type_list = {
-  'el-icon-news': 'feed',
-  'el-icon-s-data': 'gamelog'
+  'ri-rss-line': 'feed',
+  'ri-history-line': 'gamelog'
 }
 
 const selectors = {
-  feed: '.el-table_1_column_3:not(.is-leaf) > .cell',
-  gamelog: '.el-table_2_column_7:not(.is-leaf) > .cell > span'
+  feed: '.feed .el-table__cell:nth-child(3):not(.is-leaf) > .cell > span',
+  gamelog: '.el-table__cell:nth-child(2):not(.is-leaf) > .cell > span'
 }
 
 const text_template = {
@@ -21,17 +18,32 @@ const text_template = {
   'Status': 'color_status',
   'Bio': 'color_bio',
   'Avatar': 'color_avatar',
-  
-  'OnPlayerJoined': 'color_online',
-  'OnPlayerLeft': 'color_offline',
+
+  'オンライン': 'color_online',
+  'オフライン': 'color_offline',
+  '現在地': 'color_gps',
+  'ステータス': 'color_status',
+  '自己紹介': 'color_bio',
+  'アバター': 'color_avatar',
+
+  'Player joined': 'color_online',
+  'Player left': 'color_offline',
   'Location': 'color_gps',
-  'PortalSpawn': 'color_status',
   'Event': 'color_bio',
-  'VideoPlay': 'color_avatar',
+  'Video play': 'color_avatar',
   // 見たことないのでとりあえずEventと同じ扱いで
   'Extarnal': 'color_bio',
-  'StringLoad': 'color_bio',
-  'ImageLoad': 'color_bio'
+  'String load': 'color_bio',
+  'Image load': 'color_bio',
+
+  'プレイヤー参加': 'color_online',
+  'プレイヤー退出': 'color_offline',
+  '場所': 'color_gps',
+  'イベント': 'color_bio',
+  '動画を再生': 'color_avatar',
+  '外的': 'color_bio',
+  'URIの読み込み': 'color_bio',
+  '画像の読み込み': 'color_bio'
 };
 
 const stylesheet = `
@@ -63,17 +75,17 @@ const stylesheet = `
 const get_current_mode = () => {
   const active_tab = document.querySelector('.el-menu-item.is-active');
   const icon = active_tab.querySelector('i');
-  
+
   return icon_type_list[icon.classList[0]] ?? 'unsupported';
 }
 
 const tab_check = () => {
-  const current_tab = get_current_mode();
-  if(parent_tab !== current_tab){
+  let now_current_tab = get_current_mode();
+  if(parent_tab !== now_current_tab){
     // 更新する
-    console.log(`change tab: ${current_tab}`);
+    // console.log(`change tab: ${now_current_tab}`);
     change_page();
-    parent_tab = current_tab;
+    parent_tab = now_current_tab;
   }
 }
 
@@ -84,23 +96,31 @@ const apply_color = (el, color) => {
 
 const change_page = () => {
   const current_tab = get_current_mode();
-  
-  let arr;
+
+  let name, selector;
+
   switch(current_tab){
     case 'feed':
-      arr = document.querySelectorAll(selectors.feed);
+      selector = selectors.feed;
+      name = ".feed";
       break;
     case 'gamelog':
-      arr = document.querySelectorAll(selectors.gamelog);
+      selector = selectors.gamelog;
+      name = ".x-container:not(.feed)"
       break;
   }
-  
-  if(arr){
-    for(let f of arr){
-      const color = text_template[f.textContent];
-      if(color) apply_color(f, color);
+
+  const f = () => {
+    const arr = document.querySelectorAll(selector);
+    if(arr){
+      for(let f of arr){
+        const color = text_template[f.textContent];
+        if(color) apply_color(f, color);
+      }
     }
   }
+
+  wait_for_elements(name, f, 30000);
 }
 
 const callback = (mutations) => {
@@ -110,8 +130,8 @@ const callback = (mutations) => {
     }
     // タブの切り替えチェック
     tab_check();
-    let color, target;
-    
+    let color, target, row;
+
     if(mut.type === 'characterData'){
       color = text_template[mut.target.data];
       target = mut.target.parentElement;
@@ -119,8 +139,18 @@ const callback = (mutations) => {
       color = text_template[mut.target.textContent];
       target = mut.target;
     }
-    
-    if(color) apply_color(target, color);
+
+    const current_tab = get_current_mode();
+
+    if(current_tab === "feed") row = 2;
+    else if(current_tab === "gamelog") row = 1;
+    else row = 2;
+
+    const parent = target.offsetParent;
+    const row_parent = parent?.parentElement?.children?.[row];
+    if(parent && color && (parent === row_parent)){
+      apply_color(target, color);
+    }
   }
 }
 
@@ -133,7 +163,7 @@ const main = () => {
   const style_tag = document.createElement('style');
   style_tag.textContent = stylesheet;
   document.head.appendChild(style_tag);
-  
+
   // メインObserver。中身の監視をする。
   const obs_target = document.querySelector('.x-app');
   const opt = {
@@ -142,10 +172,10 @@ const main = () => {
     subtree: true,
     characterData: true
   };
-  
+
   const main_obs = new MutationObserver(callback);
   main_obs.observe(obs_target, opt);
-  
+
   // サブObserver。タブの切り替えを監視する。
   const sub_obs_target = document.querySelector('.x-menu-container');
   const sub_opt = {
@@ -153,9 +183,25 @@ const main = () => {
     attributes: true,
     subtree: true
   };
-  
+
   const sub_obs = new MutationObserver(sub_callback);
   sub_obs.observe(sub_obs_target, sub_opt);
+
+  wait_for_elements(selectors.feed, change_page);
 }
 
-setTimeout(main, load_wait * 1000);
+const wait_for_elements = (name, callback, break_time = null) => {
+  const interval = setInterval(() => {
+    const el = document.querySelector(name);
+    if(el){
+      clearInterval(interval);
+      callback();
+    }
+  }, 100);
+
+  if(break_time){
+    setTimeout(() => clearInterval(interval), break_time);
+  }
+}
+
+wait_for_elements('.el-menu', main);
