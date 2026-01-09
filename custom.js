@@ -155,6 +155,11 @@ const callback = (mutations) => {
       color = text_template[mut.target.data];
       target = mut.target.parentElement;
     }else if(mut.type === 'childList'){
+      if(mut.addedNodes.length && mut.target.nodeName === "TBODY"){
+        change_page();
+        return;
+      }
+
       color = text_template[mut.target.textContent];
       target = mut.target;
     }
